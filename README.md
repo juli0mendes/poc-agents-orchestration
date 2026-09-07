@@ -137,4 +137,3 @@ Ou executar Ollama também em container e ligar via rede Docker.
 
 - O projeto assume que os agentes irão gerar código Java 21 / Spring Boot (veja prompts em `src/agents/developer.py`).
 - Ajustar configurações do Ollama e do modelo conforme necessário (nome do modelo, memória, etc.).
-
