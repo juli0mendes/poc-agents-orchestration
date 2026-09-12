@@ -9,7 +9,7 @@
 
 Este repositório é uma PoC para aplicar e demonstrar conhecimento sobre GenAI e orchestration de agentes. A proposta é explorar como múltiplos agentes especializados podem cooperar para transformar uma solicitação de negócio em requisitos, arquitetura, implementação e validação, usando modelos de linguagem e fluxos estruturados.
 
-A implementação atual usa Python com LangChain e LangGraph para orquestrar agentes que desempenham papéis como Product Manager, Architect, Developer, QA e SRE. A execução usa um modelo local via Ollama, com saída estruturada em Pydantic.
+A implementação atual usa. Python com LangChain e LangGraph para orquestrar agentes que desempenham papéis como Product Manager, Architect, Developer, QA e SRE. A execução usa um modelo local via Ollama, com saída estruturada em Pydantic.
 
 ## Arquitetura da solução
 
