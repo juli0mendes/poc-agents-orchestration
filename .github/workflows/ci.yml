@@ -94,16 +94,26 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
           BRANCH="${{ github.ref_name }}"
           OWNER="${GITHUB_REPOSITORY%%/*}"
           echo "Checking for open PRs from $OWNER:$BRANCH to main"
-          RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls?head=$OWNER:$BRANCH&base=main&state=open")
-          if [ -n "$RESPONSE" ] && [ "$RESPONSE" != "[]" ]; then
-            echo "pr_exists=true" >> "$GITHUB_OUTPUT"
-            echo "Found existing PR for $BRANCH"
-          else
+          URL="https://api.github.com/repos/$GITHUB_REPOSITORY/pulls?head=$OWNER:$BRANCH&base=main&state=open"
+
+          HTTP_STATUS=$(curl -s -o /tmp/prs.json -w "%{http_code}" -H "Authorization: token $GITHUB_TOKEN" "$URL") || true
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Warning: GitHub API returned status $HTTP_STATUS when checking PRs. Proceeding to create PR." >&2
             echo "pr_exists=false" >> "$GITHUB_OUTPUT"
-            echo "No existing PR found for $BRANCH"
+            echo "pr_check_error=true" >> "$GITHUB_OUTPUT"
+          else
+            BODY=$(cat /tmp/prs.json || true)
+            if [ -n "$BODY" ] && [ "$BODY" != "[]" ]; then
+              echo "pr_exists=true" >> "$GITHUB_OUTPUT"
+              echo "Found existing PR for $BRANCH"
+            else
+              echo "pr_exists=false" >> "$GITHUB_OUTPUT"
+              echo "No existing PR found for $BRANCH"
+            fi
           fi
 
       - name: Create Pull Request from feature branch to main
