@@ -84,6 +84,18 @@ jobs:
             echo "updated=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Prepare feature branch for PR
+        if: startsWith(github.ref, 'refs/heads/feature/') && success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          BRANCH="feature/coverage-badge-${{ github.run_id }}"
+          git checkout -b "$BRANCH"
+          git commit --allow-empty -m "chore(ci): create branch for coverage PR (run $GITHUB_RUN_ID)"
+          git push origin "$BRANCH"
+
       - name: Create Pull Request with changes
         if: startsWith(github.ref, 'refs/heads/feature/') && success()
         uses: peter-evans/create-pull-request@v5
