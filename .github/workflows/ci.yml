@@ -84,8 +84,26 @@ jobs:
             echo "updated=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create Pull Request from feature branch to main
+      - id: check_pr
+        name: Check for existing PR from this branch
         if: startsWith(github.ref, 'refs/heads/feature/') && success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          OWNER="${GITHUB_REPOSITORY%%/*}"
+          echo "Checking for open PRs from $OWNER:$BRANCH to main"
+          RESPONSE=$(curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GITHUB_REPOSITORY/pulls?head=$OWNER:$BRANCH&base=main&state=open")
+          if [ -n "$RESPONSE" ] && [ "$RESPONSE" != "[]" ]; then
+            echo "pr_exists=true" >> "$GITHUB_OUTPUT"
+            echo "Found existing PR for $BRANCH"
+          else
+            echo "pr_exists=false" >> "$GITHUB_OUTPUT"
+            echo "No existing PR found for $BRANCH"
+          fi
+
+      - name: Create Pull Request from feature branch to main
+        if: startsWith(github.ref, 'refs/heads/feature/') && success() && steps.check_pr.outputs.pr_exists == 'false'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
