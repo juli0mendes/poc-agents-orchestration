@@ -86,7 +86,7 @@ jobs:
           fi
 
       - name: Create Pull Request with changes
-        if: startsWith(github.ref, 'refs/heads/feature/') && success() && steps.add_or_update_readme.outcome == 'success'
+        if: startsWith(github.ref, 'refs/heads/feature/') && success()
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
