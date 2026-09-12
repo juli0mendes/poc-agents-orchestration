@@ -1,139 +1,195 @@
-# PoC Agents Orchestration
+# PoC - Agents Orchestration with GenAI
 
-Projeto em Python que orquestra agentes (PM, Architect, Developer, QA, SRE) usando LangGraph e LangChain com integração local ao Ollama.
+[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Build](https://img.shields.io/badge/Build-Unknown-lightgrey)](#)
+[![Status](https://img.shields.io/badge/Status-In%20construction-orange)](#)
 
-## Linguagem
+## Sobre o projeto
 
-- Python >= 3.12
+Este repositório é uma PoC para aplicar e demonstrar conhecimento sobre GenAI e orchestration de agentes. A proposta é explorar como múltiplos agentes especializados podem cooperar para transformar uma solicitação de negócio em requisitos, arquitetura, implementação e validação, usando modelos de linguagem e fluxos estruturados.
 
-## Bibliotecas principais
+A implementação atual usa. Python com LangChain e LangGraph para orquestrar agentes que desempenham papéis como Product Manager, Architect, Developer, QA e SRE. A execução usa um modelo local via Ollama, com saída estruturada em Pydantic.
 
-As dependências estão declaradas em pyproject.toml (versões mínimas):
+## Arquitetura da solução
 
-- langchain >= 1.3.18
-- langchain-ollama >= 1.1.0
-- langgraph >= 1.2.11
-- pydantic >= 2.13.5
-- python-dotenv >= 1.2.3
+A arquitetura do workflow segue uma sequência simples e didática:
 
-(Ver `pyproject.toml` para referência.)
+- PM: interpreta a tarefa e gera requisitos.
+- Architect: define a arquitetura técnica proposta.
+- Developer: produz a implementação em arquivos estruturados.
+- QA: valida a implementação e aponta problemas.
+- SRE: etapa final de operação/observabilidade (em evolução).
 
-## Como instalar dependências
+O estado do workflow é orquestrado com `StateGraph` e persistido em SQLite para registrar o estado de execução.
 
-1. Criar e ativar um ambiente virtual:
+## Requisitos e execução rápida
 
-   - macOS / Linux:
-     ```bash
-     python -m venv .venv
-     source .venv/bin/activate
-     ```
+### Requisitos
 
-   - Windows (PowerShell):
-     ```powershell
-     python -m venv .venv
-     .\.venv\Scripts\Activate.ps1
-     ```
+- Git
+- Python 3.12+
+- uv
+- Ollama instalado e em execução
 
-2. Atualizar pip e instalar o pacote localmente:
+### 1) Instalando Python no macOS/Unix
 
-   ```bash
-   python -m pip install --upgrade pip
-   pip install -e .
-   ```
-
-Isso instalará as dependências listadas em `pyproject.toml`.
-
-## Como rodar local
-
-- Executar o fluxo principal:
-
-  ```bash
-  python src/main.py
-  ```
-
-  O script inicializa um fluxo de orquestração (graph) e imprime requirements, arquitetura e implementação gerados pelos agentes.
-
-## Uso da LLM local (Ollama)
-
-O projeto usa `langchain-ollama` para conectar-se a um servidor Ollama executando localmente.
-
-Passos mínimos:
-
-1. Instalar Ollama (https://ollama.com):
-   - macOS (Homebrew): `brew install ollama`
-   - Linux / outras plataformas: seguir instruções oficiais em https://ollama.com
-
-2. Baixar o modelo usado pelo projeto (exemplo):
-
-   ```bash
-   ollama pull qwen3:8b
-   ```
-
-3. Garantir que o daemon do Ollama esteja disponível. Verificar com:
-
-   ```bash
-   ollama ls
-   ```
-
-4. O cliente `langchain-ollama` conecta ao daemon local no endpoint padrão (http://localhost:11434). Se o Ollama estiver em outro host/porta, exporte uma variável de ambiente apontando para a API do Ollama antes de rodar o script (exemplo):
-
-   ```bash
-   export OLLAMA_API_BASE=http://host:11434
-   ```
-
-Observação: o código já referencia o modelo `qwen3:8b` nas instâncias de ChatOllama dentro de `src/agents/`.
-
-## Comandos úteis
-
-- Instalar dependências:
-  - `pip install -e .`
-- Executar o programa:
-  - `python src/main.py`
-- Trabalhar com Ollama:
-  - `ollama pull qwen3:8b`  # baixar modelo
-  - `ollama ls`            # listar modelos disponíveis
-- Empacotar / instalar (opcional):
-  - `python -m pip install .`
-
-## Docker (exemplo)
-
-Não há Dockerfile no repositório por padrão. Exemplo mínimo para containerizar a aplicação:
-
-1. Dockerfile (exemplo):
-
-```
-FROM python:3.12-slim
-WORKDIR /app
-COPY pyproject.toml .
-COPY src ./src
-RUN python -m pip install --upgrade pip && pip install -e .
-CMD ["python", "src/main.py"]
-```
-
-2. Build e run:
+Se você ainda não tiver Python 3.12+, o jeito mais simples no macOS é via Homebrew:
 
 ```bash
-docker build -t poc-agents-orchestration:latest .
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Depois da instalação do Homebrew
+brew update
+brew install python@3.12
 ```
 
-Para que o container acesse um daemon Ollama rodando no host local, uma opção (mac/linux) é usar `host.docker.internal` como host do Ollama e expor a porta 11434. Ao executar o container, passe a variável de ambiente apontando para o endpoint do Ollama:
+Verifique a instalação:
 
 ```bash
-docker run --rm -e OLLAMA_API_BASE=http://host.docker.internal:11434 poc-agents-orchestration:latest
+python3 --version
 ```
 
-Ou executar Ollama também em container e ligar via rede Docker.
+Se quiser, também pode usar `pyenv` para gerenciar múltiplas versões do Python:
 
-## Estrutura principal
+```bash
+brew install pyenv
 
-- src/
-  - agents/  -> agentes (pm, architect, developer, qa, sre)
-  - models/  -> modelos Pydantic para saída estruturada
-  - persistence/ -> persistência SQLite (se aplicável)
-  - graph.py -> orquestrador de estados (LangGraph)
-  - main.py -> ponto de entrada de exemplo
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
+echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+echo 'eval "$(pyenv init - zsh)"' >> ~/.zshrc
+source ~/.zshrc
+
+pyenv install 3.12.7
+pyenv local 3.12.7
+```
+
+### 2) Instalando o Ollama no macOS/Unix
+
+O Ollama pode ser instalado via script oficial ou via Homebrew:
+
+```bash
+brew install ollama
+```
+
+Ou, se preferir seguir a instalação oficial:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+Após a instalação, inicie o serviço:
+
+```bash
+ollama serve
+```
+
+### 3) Instalando o modelo local qwen3:8b
+
+```bash
+ollama pull qwen3:8b
+```
+
+Verifique se ele foi baixado corretamente:
+
+```bash
+ollama list
+```
+
+### 4) Instalando o gerenciador de dependências uv
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Ou com Homebrew:
+
+```bash
+brew install uv
+```
+
+Confirme:
+
+```bash
+uv --version
+```
+
+### 5) Clonando o projeto
+
+```bash
+git clone https://github.com/<seu-usuario>/poc-agents-orchestration.git
+cd poc-agents-orchestration
+```
+
+### 6) Instalando as dependências do projeto
+
+No diretório do repositório:
+
+```bash
+uv sync
+```
+
+Se preferir instalar manualmente em um ambiente virtual:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip
+pip install -e .
+```
+
+### 7) Executando o workflow
+
+```bash
+uv run python src/main.py
+```
+
+### 8) Verificando se tudo está pronto
+
+```bash
+ollama run qwen3:8b "Teste de conexão. Responda apenas com 'ok'."
+```
+
+Se a resposta for `ok`, o modelo local está funcionando corretamente e o projeto pode ser executado.
+
+### Troubleshooting rápido
+
+- Se `python3` não for encontrado: instale o Python 3.12+ com Homebrew ou `pyenv`.
+- Se `uv` não for encontrado: confirme a instalação do shell profile e reinicie o terminal.
+- Se `ollama serve` falhar: certifique-se de que o Ollama foi instalado corretamente e que o processo não está bloqueado por outra instância.
+- Se o modelo `qwen3:8b` não existir localmente: rode `ollama pull qwen3:8b`.
+- Se houver erro de importação do Python: confirme que você está no diretório correto e que o ambiente está ativo.
+
+## Stack principal
+
+- Python
+- LangChain
+- LangGraph
+- Pydantic
+- SQLite
+- Ollama
+- qwen3:8b
+
+## Licença
+
+Este projeto está licenciado sob a MIT License. O texto completo da licença está disponível no arquivo [LICENSE](LICENSE).
+
+A licença permite uso, cópia, modificação, fusão, publicação, distribuição e venda do software, desde que o aviso de copyright e a permissão sejam mantidos em todas as cópias e trechos relevantes do código.
+
+## Contribuição
+
+Contribuições são bem-vindas por meio de issues e pull requests. Para manter o projeto consistente com a proposta de PoC, favoreça mudanças pequenas, focadas e bem documentadas, sem alterar a lógica central do workflow de agentes.
+
+Antes de enviar mudanças, valide se a alteração:
+
+- respeita o objetivo educacional e de demonstração do projeto;
+- não introduz infraestrutura ou configuração desnecessária;
+- mantém compatibilidade com Python, LangChain, LangGraph e Ollama;
+- preserva a estrutura documental e o foco em GenAI e orchestration de agentes.
 
 ## Observações
 
-- O projeto assume que os agentes irão gerar código Java 21 / Spring Boot (veja prompts em `src/agents/developer.py`).
-- Ajustar configurações do Ollama e do modelo conforme necessário (nome do modelo, memória, etc.).
+- O projeto é experimental e está em construção.
+- As instruções de agentes e a documentação foram pensadas para facilitar uso por LLMs e humanos.
+- A lógica central não deve ser alterada sem necessidade, para preservar a natureza de prova de conceito.
+
