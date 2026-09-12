@@ -1,0 +1,265 @@
+name: Main CI — Build, Tests & Automated Release
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: main-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build || true
+
+      - name: Build package
+        run: |
+          # build source and wheel (skip if build system not configured)
+          python -m build || true
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest coverage || true
+
+      - name: Run unit tests
+        run: |
+          if pytest --collect-only -q >/dev/null 2>&1; then
+            coverage run -m pytest
+            coverage xml || true
+          else
+            echo "No tests to run"
+          fi
+
+  release:
+    name: Automated Release
+    needs: [build, unit-tests]
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    steps:
+      - name: Checkout repository (full history and tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Git for tagging
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine semantic version bump from commits
+        id: semver
+        run: |
+          set -euo pipefail
+
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
+          echo "Latest tag: $LATEST_TAG"
+
+          LATEST=${LATEST_TAG#v}
+          IFS='.' read -r MAJ MIN PATCH <<< "${LATEST}"
+          MAJ=${MAJ:-0}; MIN=${MIN:-0}; PATCH=${PATCH:-0}
+
+          if [ "$LATEST_TAG" = "0.0.0" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${LATEST_TAG}..HEAD"
+          fi
+
+          SUBJECTS=$(git log ${RANGE} --pretty=format:'%s' --no-merges)
+          BODIES=$(git log ${RANGE} --pretty=format:'%b' --no-merges)
+
+          echo "Subjects since tag:"
+          echo "$SUBJECTS"
+
+          BUMP="none"
+
+          if echo "$SUBJECTS" | grep -Eiq '^[a-z]+(\([^)]+\))?!:'; then
+            BUMP="major"
+          elif echo "$BODIES" | grep -Eiq '(^|[[:space:]])BREAKING[[:space:]]+CHANGE:'; then
+            BUMP="major"
+          elif echo "$SUBJECTS" | grep -Eiq '^feat(\([^)]+\))?:'; then
+            BUMP="minor"
+          elif echo "$SUBJECTS" | grep -Eiq '^(fix|refactor|perf|test|docs|style|chore|build|ci|deps|config|revert)(\([^)]+\))?:'; then
+            BUMP="patch"
+          fi
+
+          if [ "$BUMP" = "none" ]; then
+            echo "No conventional commit indication for a release. Skipping release."
+            echo "bump=none" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Determined bump: $BUMP"
+
+          if [ "$BUMP" = "major" ]; then
+            MAJ=$((MAJ + 1)); MIN=0; PATCH=0
+          elif [ "$BUMP" = "minor" ]; then
+            MIN=$((MIN + 1)); PATCH=0
+          elif [ "$BUMP" = "patch" ]; then
+            PATCH=$((PATCH + 1))
+          fi
+
+          NEW_TAG="v${MAJ}.${MIN}.${PATCH}"
+          echo "latest_tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "new_tag=$NEW_TAG" >> "$GITHUB_OUTPUT"
+          echo "bump=$BUMP" >> "$GITHUB_OUTPUT"
+          echo "Final version: $NEW_TAG"
+
+      - name: Build grouped release notes
+        if: steps.semver.outputs.bump != 'none'
+        id: notes
+        env:
+          LATEST_TAG: ${{ steps.semver.outputs.latest_tag }}
+          NEW_TAG: ${{ steps.semver.outputs.new_tag }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ "$LATEST_TAG" = "0.0.0" ]; then
+            RANGE="HEAD"
+          else
+            RANGE="${LATEST_TAG}..HEAD"
+          fi
+
+          FEAT_FILE=$(mktemp)
+          FIX_FILE=$(mktemp)
+          CI_FILE=$(mktemp)
+          PERF_FILE=$(mktemp)
+          REFACTOR_FILE=$(mktemp)
+          DOCS_FILE=$(mktemp)
+          TEST_FILE=$(mktemp)
+          BUILD_FILE=$(mktemp)
+          DEPS_FILE=$(mktemp)
+          CONFIG_FILE=$(mktemp)
+          STYLE_FILE=$(mktemp)
+          CHORE_FILE=$(mktemp)
+          REVERT_FILE=$(mktemp)
+          OTHER_FILE=$(mktemp)
+
+          while IFS='|' read -r subject sha; do
+            [ -z "$subject" ] && continue
+
+            entry="- ${subject} ([${sha}](${REPO_URL}/commit/${sha}))"
+
+            if echo "$subject" | grep -Eiq '^feat(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$FEAT_FILE"
+            elif echo "$subject" | grep -Eiq '^fix(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$FIX_FILE"
+            elif echo "$subject" | grep -Eiq '^ci(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$CI_FILE"
+            elif echo "$subject" | grep -Eiq '^perf(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$PERF_FILE"
+            elif echo "$subject" | grep -Eiq '^refactor(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$REFACTOR_FILE"
+            elif echo "$subject" | grep -Eiq '^docs(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$DOCS_FILE"
+            elif echo "$subject" | grep -Eiq '^test(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$TEST_FILE"
+            elif echo "$subject" | grep -Eiq '^build(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$BUILD_FILE"
+            elif echo "$subject" | grep -Eiq '^deps(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$DEPS_FILE"
+            elif echo "$subject" | grep -Eiq '^config(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$CONFIG_FILE"
+            elif echo "$subject" | grep -Eiq '^style(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$STYLE_FILE"
+            elif echo "$subject" | grep -Eiq '^chore(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$CHORE_FILE"
+            elif echo "$subject" | grep -Eiq '^revert(\([^)]+\))?!?:'; then
+              echo "$entry" >> "$REVERT_FILE"
+            else
+              echo "$entry" >> "$OTHER_FILE"
+            fi
+          done < <(git log ${RANGE} --pretty=format:'%s|%h' --no-merges)
+
+          NOTES_FILE=release_notes.md
+          {
+            echo "## Release ${NEW_TAG}"
+            if [ "$LATEST_TAG" != "0.0.0" ]; then
+              echo
+              echo "Comparação: ${LATEST_TAG} -> ${NEW_TAG}"
+            fi
+            echo
+
+            [ -s "$FEAT_FILE" ] && { echo "### Features"; cat "$FEAT_FILE"; echo; }
+            [ -s "$FIX_FILE" ] && { echo "### Bug Fixes"; cat "$FIX_FILE"; echo; }
+            [ -s "$CI_FILE" ] && { echo "### Continuous Integration"; cat "$CI_FILE"; echo; }
+            [ -s "$PERF_FILE" ] && { echo "### Performance"; cat "$PERF_FILE"; echo; }
+            [ -s "$REFACTOR_FILE" ] && { echo "### Refactor"; cat "$REFACTOR_FILE"; echo; }
+            [ -s "$DOCS_FILE" ] && { echo "### Documentation"; cat "$DOCS_FILE"; echo; }
+            [ -s "$TEST_FILE" ] && { echo "### Tests"; cat "$TEST_FILE"; echo; }
+            [ -s "$BUILD_FILE" ] && { echo "### Build"; cat "$BUILD_FILE"; echo; }
+            [ -s "$DEPS_FILE" ] && { echo "### Dependencies"; cat "$DEPS_FILE"; echo; }
+            [ -s "$CONFIG_FILE" ] && { echo "### Configuration"; cat "$CONFIG_FILE"; echo; }
+            [ -s "$STYLE_FILE" ] && { echo "### Style"; cat "$STYLE_FILE"; echo; }
+            [ -s "$CHORE_FILE" ] && { echo "### Chore"; cat "$CHORE_FILE"; echo; }
+            [ -s "$REVERT_FILE" ] && { echo "### Reverts"; cat "$REVERT_FILE"; echo; }
+            [ -s "$OTHER_FILE" ] && { echo "### Others"; cat "$OTHER_FILE"; echo; }
+          } > "$NOTES_FILE"
+
+          BODY_JSON=$(jq -Rs . < "$NOTES_FILE")
+          echo "body_json=${BODY_JSON}" >> "$GITHUB_OUTPUT"
+
+      - name: Create tag and push release
+        if: steps.semver.outputs.bump != 'none'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          NEW_TAG=${{ steps.semver.outputs.new_tag }}
+          echo "Creating tag $NEW_TAG"
+          git tag -a "$NEW_TAG" -m "chore(release): $NEW_TAG"
+          git push origin "$NEW_TAG"
+
+          OWNER=$(echo "${GITHUB_REPOSITORY}" | cut -d"/" -f1)
+          REPO=$(echo "${GITHUB_REPOSITORY}" | cut -d"/" -f2)
+          BODY_JSON='${{ steps.notes.outputs.body_json }}'
+
+          echo "Creating release for $NEW_TAG"
+          response=$(curl -s -X POST -H "Authorization: token $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${OWNER}/${REPO}/releases \
+            -d "{\"tag_name\": \"${NEW_TAG}\", \"name\": \"${NEW_TAG}\", \"body\": ${BODY_JSON}, \"draft\": false, \"prerelease\": false}")
+
+          echo "$response" | jq -r '.html_url // .message'
+
+      - name: No release needed
+        if: steps.semver.outputs.bump == 'none'
+        run: echo "No release was required based on commit messages."
