@@ -75,7 +75,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore(ci): update coverage badge\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
-          branch: "update/coverage-badge"
+          # create a feature branch per run to open PRs like feature/coverage-badge-<run_id>
+          branch: "feature/coverage-badge-${{ github.run_id }}"
           title: "chore: update coverage badge"
           body: "Automated coverage badge update"
           labels: automated
