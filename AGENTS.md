@@ -6,6 +6,28 @@ Este repositório é uma PoC (proof of concept) para aplicar conhecimento sobre 
 
 O projeto usa LangChain + LangGraph para orquestrar chamadas estruturadas a um modelo local de LLM via Ollama. As saídas dos agentes são modeladas com Pydantic para manter contratos e facilitar a validação do que cada etapa produz.
 
+## CI/CD e automação
+
+Este repositório inclui pipelines de Continuous Integration e entrega automatizada em GitHub Actions para validar mudanças em branches de desenvolvimento e preparar releases no `main`.
+
+### Workflows ativos
+
+- `feature.yml`
+  - nome: `Feature CI — Build & Unit Tests & Auto PR to main`
+  - dispara em `push` para branches `feature*` e `feature/**`
+  - instala Python 3.12, empacota o projeto e executa `pytest` quando há testes
+  - gera `coverage.xml` e `coverage.svg` e publica artefato de cobertura
+  - atualiza o badge de cobertura no `README.md` e cria/atualiza PR para `main`
+
+- `main.yml`
+  - nome: `Main CI — Build, Tests & Automated Release`
+  - dispara em `push` para `main`
+  - executa jobs de build, testes e release
+  - calcula bump semântico a partir de Conventional Commits
+  - cria tags e releases com changelog agrupado por tipo de alteração
+
+Essas automações devem ser respeitadas ao alterar código, documentação ou processos de validação do repositório.
+
 ## Licença
 
 Este projeto é distribuído sob a MIT License. O texto completo da licença está em `LICENSE` e deve ser mantido junto ao código e à documentação do repositório.

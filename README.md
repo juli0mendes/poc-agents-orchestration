@@ -2,14 +2,23 @@
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Build](https://img.shields.io/badge/Build-Unknown-lightgrey)](#)
-[![Status](https://img.shields.io/badge/Status-In%20construction-orange)](#)
+[![Feature CI](https://github.com/juli0mendes/poc-agents-orchestration/actions/workflows/feature.yml/badge.svg?branch=main)](https://github.com/juli0mendes/poc-agents-orchestration/actions/workflows/feature.yml)
+[![Main CI](https://github.com/juli0mendes/poc-agents-orchestration/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/juli0mendes/poc-agents-orchestration/actions/workflows/main.yml)
 
 ## Sobre o projeto
 
 Este repositório é uma PoC para aplicar e demonstrar conhecimento sobre GenAI e orchestration de agentes. A proposta é explorar como múltiplos agentes especializados podem cooperar para transformar uma solicitação de negócio em requisitos, arquitetura, implementação e validação, usando modelos de linguagem e fluxos estruturados.
 
 A implementação atual usa. Python com LangChain e LangGraph para orquestrar agentes que desempenham papéis como Product Manager, Architect, Developer, QA e SRE. A execução usa um modelo local via Ollama, com saída estruturada em Pydantic.
+
+## Status de CI
+
+Este repositório inclui automações de validação e entrega contínua em GitHub Actions:
+
+- `feature.yml`: executa build, testes e análise de cobertura em branches de feature; gera artefatos e cria/atualiza PR para `main`.
+- `main.yml`: valida `main`, executa testes, calcula versionamento semântico e cria tag/release automática quando os commits seguem a convenção do Conventional Commits.
+
+Essas pipelines ajudam a manter a qualidade do código, a publicar artefatos e a automatizar a revisão e o release do projeto.
 
 ## Arquitetura da solução
 
