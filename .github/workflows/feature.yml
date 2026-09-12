@@ -1,4 +1,4 @@
-name: CI
+name: Feature CI — Build & Unit Tests & Auto PR to main
 
 permissions:
   contents: write
@@ -6,10 +6,10 @@ permissions:
 
 on:
   push:
-    branches: [main, 'feature/**']
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
+    branches:
+      - 'feature*'
+      - 'feature/**'
+  workflow_dispatch: {}
 
 jobs:
   ci:
