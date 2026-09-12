@@ -2,7 +2,6 @@
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Feature CI](https://github.com/juli0mendes/poc-agents-orchestration/actions/workflows/feature.yml/badge.svg?branch=main)](https://github.com/juli0mendes/poc-agents-orchestration/actions/workflows/feature.yml)
 [![Main CI](https://github.com/juli0mendes/poc-agents-orchestration/actions/workflows/main.yml/badge.svg?branch=main)](https://github.com/juli0mendes/poc-agents-orchestration/actions/workflows/main.yml)
 
 ## Sobre o projeto
