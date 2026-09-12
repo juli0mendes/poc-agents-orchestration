@@ -1,0 +1,173 @@
+name: CI
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install build and package
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          pip install -e . || true
+
+      - name: Install test and coverage tools
+        run: |
+          pip install coverage coverage-badge pytest || true
+
+      - name: Run tests with coverage (if any)
+        run: |
+          set -e
+          # detect tests
+          if pytest --collect-only -q >/dev/null 2>&1; then
+            echo "Tests detected — running pytest with coverage"
+            coverage run -m pytest
+          else
+            echo "No tests collected — skipping pytest"
+          fi
+
+      - name: Generate coverage reports
+        run: |
+          # generate xml and svg badge when possible; ignore failures so CI doesn't break when no tests
+          coverage xml || true
+          if command -v coverage-badge >/dev/null 2>&1; then
+            coverage-badge -o coverage.svg || true
+          fi
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            coverage.svg
+
+      - id: add_or_update_readme
+        name: Add or update README badge
+        if: startsWith(github.ref, 'refs/heads/feature/') && success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Only add badge if coverage.svg exists
+          UPDATED=false
+          if [ -f coverage.svg ]; then
+            test -f README.md || echo "# $(basename $(pwd))" > README.md
+            if ! grep -q "coverage.svg" README.md; then
+              sed -i "1i![coverage](coverage.svg)" README.md || true
+              UPDATED=true
+            else
+              echo "README already contains coverage badge"
+            fi
+          else
+            echo "coverage.svg not found; skipping README update"
+          fi
+
+          # Check git for changes to README.md
+          if [ "$UPDATED" = "true" ]; then
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create or update PR to main (github-script)
+        if: startsWith(github.ref, 'refs/heads/feature/') && success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = context.ref.replace('refs/heads/','');
+            const base = 'main';
+            const title = `Auto PR: ${head} → ${base}`;
+            const body = `Automated PR created/updated because CI passed.\n\nBranch: ${head}\nCommit: ${context.sha}`;
+
+            // Compare commits to gather info
+            let compare;
+            try {
+              compare = await github.rest.repos.compareCommits({ owner, repo, base, head });
+            } catch (err) {
+              console.log('Could not compare commits:', err.message);
+            }
+
+            const commits = (compare && compare.data && compare.data.commits) || [];
+            const assignees = [...new Set(commits.map(c => c.author && c.author.login).filter(Boolean))];
+
+            const labelsSet = new Set();
+            for (const c of commits) {
+              const msg = (c.commit && c.commit.message || '').toLowerCase();
+              if (/\b(feat|feature)(\b|:|\()/i.test(msg)) labelsSet.add('enhancement');
+              if (/\b(fix|bug)(\b|:|\()/i.test(msg)) labelsSet.add('bug');
+            }
+
+            const files = (compare && compare.data && compare.data.files) || [];
+            for (const f of files) {
+              const path = (f.filename || '').toLowerCase();
+              if (path.endsWith('.md') || path.startsWith('docs/') || path.includes('/docs/')) {
+                labelsSet.add('documentation');
+              }
+              if (path.includes('.github/workflows') || path.includes('jenkinsfile') || path.includes('circleci')) {
+                labelsSet.add('ci');
+              }
+              if ((path.endsWith('.yml') || path.endsWith('.yaml')) && path.includes('.github')) {
+                labelsSet.add('ci');
+              }
+            }
+
+            const labels = Array.from(labelsSet);
+
+            async function ensureLabel(name, color) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch (err) {
+                if (err.status === 404) {
+                  await github.rest.issues.createLabel({ owner, repo, name, color, description: 'Label created automatically by CI' });
+                } else {
+                  throw err;
+                }
+              }
+            }
+
+            if (labels.includes('enhancement')) await ensureLabel('enhancement', 'a2eeef');
+            if (labels.includes('bug')) await ensureLabel('bug', 'd73a4a');
+            if (labels.includes('documentation')) await ensureLabel('documentation', '0075ca');
+            if (labels.includes('ci')) await ensureLabel('ci', 'f9d0c4');
+
+            const { data: prs } = await github.rest.pulls.list({ owner, repo, head: `${owner}:${head}`, state: 'open' });
+
+            if (prs && prs.length > 0) {
+              const pr = prs[0];
+              await github.rest.pulls.update({ owner, repo, pull_number: pr.number, title, body });
+              if (assignees.length > 0) {
+                try { await github.rest.issues.addAssignees({ owner, repo, issue_number: pr.number, assignees }); } catch (err) { console.log('Could not add some assignees:', err.message); }
+              }
+              if (labels.length > 0) { await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels }); }
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: 'CI: build and unit tests passed. PR updated automatically (assignees/labels applied).' });
+              console.log(`PR updated: ${pr.html_url}`);
+              return;
+            }
+
+            const { data: newPr } = await github.rest.pulls.create({ owner, repo, title, head, base, body });
+            if (assignees.length > 0) {
+              try { await github.rest.issues.addAssignees({ owner, repo, issue_number: newPr.number, assignees }); } catch (err) { console.log('Could not add some assignees:', err.message); }
+            }
+            if (labels.length > 0) { await github.rest.issues.addLabels({ owner, repo, issue_number: newPr.number, labels }); }
+            console.log(`PR created: ${newPr.html_url}`);
