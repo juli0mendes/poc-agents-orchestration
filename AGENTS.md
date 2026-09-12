@@ -14,21 +14,19 @@ Este repositório inclui pipelines de Continuous Integration e entrega automatiz
 
 - `feature.yml`
   - nome: `Feature CI — Build & Unit Tests & Auto PR to main`
-  - dispara em `push` para branches `feature*` e `feature/**`;
-  - usa Python 3.12;
-  - instala o pacote e ferramentas de cobertura;
-  - executa `pytest` quando a suíte existe;
-  - gera `coverage.xml` e `coverage.svg` e publica artefato de cobertura;
-  - atualiza o badge de cobertura no `README.md` e cria/atualiza PR para `main`.
+  - dispara em `push` para branches `feature*` e `feature/**`
+  - instala Python 3.12, empacota o projeto e executa `pytest` quando há testes
+  - gera `coverage.xml` e `coverage.svg` e publica artefato de cobertura
+  - atualiza o badge de cobertura no `README.md` e cria/atualiza PR para `main`
 
 - `main.yml`
   - nome: `Main CI — Build, Tests & Automated Release`
-  - dispara em `push` para `main`;
-  - executa jobs de build, testes unitários e release;
-  - calcula versionamento semântico com base em Conventional Commits;
-  - cria tags (`vX.Y.Z`) e releases no GitHub com changelog agrupado por tipo de alteração.
+  - dispara em `push` para `main`
+  - executa jobs de build, testes e release
+  - calcula bump semântico a partir de Conventional Commits
+  - cria tags e releases com changelog agrupado por tipo de alteração
 
-Essas automações são parte importante do ciclo de desenvolvimento do projeto e devem ser respeitadas ao alterar código, documentação ou rotinas de validação.
+Essas automações devem ser respeitadas ao alterar código, documentação ou processos de validação do repositório.
 
 ## Licença
 

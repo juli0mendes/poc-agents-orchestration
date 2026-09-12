@@ -11,26 +11,14 @@ Este repositório é uma PoC para aplicar e demonstrar conhecimento sobre GenAI 
 
 A implementação atual usa. Python com LangChain e LangGraph para orquestrar agentes que desempenham papéis como Product Manager, Architect, Developer, QA e SRE. A execução usa um modelo local via Ollama, com saída estruturada em Pydantic.
 
-## CI/CD e automações
+## Status de CI
 
-O repositório agora inclui automações de integração contínua em GitHub Actions para apoiar a validação do código em branches de desenvolvimento e a publicação automatizada em `main`.
+Este repositório inclui automações de validação e entrega contínua em GitHub Actions:
 
-### Fluxos configurados
+- `feature.yml`: executa build, testes e análise de cobertura em branches de feature; gera artefatos e cria/atualiza PR para `main`.
+- `main.yml`: valida `main`, executa testes, calcula versionamento semântico e cria tag/release automática quando os commits seguem a convenção do Conventional Commits.
 
-- `feature.yml` (`Feature CI — Build & Unit Tests & Auto PR to main`)
-  - dispara em `push` para branches `feature*` e `feature/**`;
-  - instala Python 3.12, empacota o projeto e executa `pytest` quando existem testes;
-  - gera relatórios de cobertura em `coverage.xml` e `coverage.svg`;
-  - publica artefatos e atualiza o badge de cobertura no `README.md` quando a branch é de feature;
-  - cria ou atualiza automaticamente um PR para `main`, com labels e assignees baseados nos commits e arquivos alterados.
-
-- `main.yml` (`Main CI — Build, Tests & Automated Release`)
-  - dispara em `push` para `main`;
-  - executa jobs de `build` e `unit-tests` em paralelo;
-  - calcula o bump semântico a partir das mensagens de commit (Conventional Commits);
-  - cria tag `vX.Y.Z` e release no GitHub com notas agrupadas por tipo de alteração (`feat`, `fix`, `ci`, `docs`, etc.).
-
-Essas automações servem como camada de validação e entrega contínua para manter o projeto consistente, com revisão automática de PR e versionamento orientado por convenção de commits.
+Essas pipelines ajudam a manter a qualidade do código, a publicar artefatos e a automatizar a revisão e o release do projeto.
 
 ## Arquitetura da solução
 
@@ -213,3 +201,4 @@ Antes de enviar mudanças, valide se a alteração:
 - O projeto é experimental e está em construção.
 - As instruções de agentes e a documentação foram pensadas para facilitar uso por LLMs e humanos.
 - A lógica central não deve ser alterada sem necessidade, para preservar a natureza de prova de conceito.
+
