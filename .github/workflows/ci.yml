@@ -62,7 +62,6 @@ jobs:
         if: startsWith(github.ref, 'refs/heads/feature/') && success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        runs-on: ubuntu-latest
         run: |
           # Only add badge if coverage.svg exists
           UPDATED=false
