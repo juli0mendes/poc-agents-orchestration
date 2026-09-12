@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install build and package
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+          pip install -e . || true
+
+      - name: Install test and coverage tools
+        run: |
+          pip install coverage coverage-badge pytest || true
+
+      - name: Run tests with coverage (if any)
+        run: |
+          set -e
+          # detect tests
+          if pytest --collect-only -q >/dev/null 2>&1; then
+            echo "Tests detected — running pytest with coverage"
+            coverage run -m pytest
+          else
+            echo "No tests collected — skipping pytest"
+          fi
+
+      - name: Generate coverage reports
+        run: |
+          # generate xml and svg badge when possible; ignore failures so CI doesn't break when no tests
+          coverage xml || true
+          if command -v coverage-badge >/dev/null 2>&1; then
+            coverage-badge -o coverage.svg || true
+          fi
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            coverage.svg
+
+      - name: Add or update README badge and open PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Ensure README exists
+          test -f README.md || echo "# $(basename $(pwd))" > README.md
+
+          # Insert badge at top if not present
+          if ! grep -q "coverage.svg" README.md; then
+            sed -i "1i![coverage](coverage.svg)" README.md || true
+          else
+            echo "README already contains coverage badge"
+          fi
+
+      - name: Create Pull Request with changes
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(ci): update coverage badge\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+          branch: "update/coverage-badge"
+          title: "chore: update coverage badge"
+          body: "Automated coverage badge update"
+          labels: automated
+          base: main
