@@ -213,4 +213,3 @@ Antes de enviar mudanças, valide se a alteração:
 - O projeto é experimental e está em construção.
 - As instruções de agentes e a documentação foram pensadas para facilitar uso por LLMs e humanos.
 - A lógica central não deve ser alterada sem necessidade, para preservar a natureza de prova de conceito.
-
