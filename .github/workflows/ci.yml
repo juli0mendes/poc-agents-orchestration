@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**']
   pull_request:
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -56,21 +57,25 @@ jobs:
             coverage.xml
             coverage.svg
 
-      - name: Add or update README badge and open PR
+      - name: Add or update README badge
+        if: startsWith(github.ref, 'refs/heads/feature/') && success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Ensure README exists
-          test -f README.md || echo "# $(basename $(pwd))" > README.md
-
-          # Insert badge at top if not present
-          if ! grep -q "coverage.svg" README.md; then
-            sed -i "1i![coverage](coverage.svg)" README.md || true
+          # Only add badge if coverage.svg exists
+          if [ -f coverage.svg ]; then
+            test -f README.md || echo "# $(basename $(pwd))" > README.md
+            if ! grep -q "coverage.svg" README.md; then
+              sed -i "1i![coverage](coverage.svg)" README.md || true
+            else
+              echo "README already contains coverage badge"
+            fi
           else
-            echo "README already contains coverage badge"
+            echo "coverage.svg not found; skipping README update"
           fi
 
       - name: Create Pull Request with changes
+        if: startsWith(github.ref, 'refs/heads/feature/') && success() && steps.add_or_update_readme.outcome == 'success'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
