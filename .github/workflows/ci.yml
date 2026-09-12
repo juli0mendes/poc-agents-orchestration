@@ -57,21 +57,32 @@ jobs:
             coverage.xml
             coverage.svg
 
-      - name: Add or update README badge
+      - id: add_or_update_readme
+        name: Add or update README badge
         if: startsWith(github.ref, 'refs/heads/feature/') && success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        runs-on: ubuntu-latest
         run: |
           # Only add badge if coverage.svg exists
+          UPDATED=false
           if [ -f coverage.svg ]; then
             test -f README.md || echo "# $(basename $(pwd))" > README.md
             if ! grep -q "coverage.svg" README.md; then
               sed -i "1i![coverage](coverage.svg)" README.md || true
+              UPDATED=true
             else
               echo "README already contains coverage badge"
             fi
           else
             echo "coverage.svg not found; skipping README update"
+          fi
+
+          # Check git for changes to README.md
+          if [ "$UPDATED" = "true" ]; then
+            echo "updated=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "updated=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Create Pull Request with changes
