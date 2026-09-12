@@ -12,9 +12,9 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  feature-ci:
+  feature-build:
+    name: Build
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -29,6 +29,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install build
           pip install -e . || true
+
+  feature-unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    needs: feature-build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
 
       - name: Install test and coverage tools
         run: |
@@ -62,12 +75,10 @@ jobs:
             coverage.svg
 
       - id: add_or_update_readme
-        name: Add or update README badge
-        if: startsWith(github.ref, 'refs/heads/feature/') && success()
+        name: Add or update README badge and push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Only add badge if coverage.svg exists
           UPDATED=false
           if [ -f coverage.svg ]; then
             test -f README.md || echo "# $(basename $(pwd))" > README.md
@@ -81,15 +92,28 @@ jobs:
             echo "coverage.svg not found; skipping README update"
           fi
 
-          # Check git for changes to README.md
           if [ "$UPDATED" = "true" ]; then
             echo "updated=true" >> "$GITHUB_OUTPUT"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add README.md || true
+            git commit -m "chore(ci): update coverage badge (run $GITHUB_RUN_ID)" || echo "no changes to commit"
+            BRANCH=${GITHUB_REF#refs/heads/}
+            git push origin "HEAD:${BRANCH}" || echo "push failed (check permissions)"
           else
             echo "updated=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Create or update PR to main (github-script)
-        if: startsWith(github.ref, 'refs/heads/feature/') && success()
+  create-or-update-pr:
+    name: Create or update PR to main
+    needs: [feature-build, feature-unit-tests]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/feature') && success()
+    steps:
+      - name: Checkout (needed for context)
+        uses: actions/checkout@v4
+
+      - name: Create or update PR
         uses: actions/github-script@v6
         with:
           script: |
