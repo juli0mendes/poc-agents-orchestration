@@ -88,42 +88,86 @@ jobs:
             echo "updated=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - id: check_pr
-        name: Check for existing PR from this branch
+      - name: Create or update PR to main (github-script)
         if: startsWith(github.ref, 'refs/heads/feature/') && success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          BRANCH="${{ github.ref_name }}"
-          OWNER="${GITHUB_REPOSITORY%%/*}"
-          echo "Checking for open PRs from $OWNER:$BRANCH to main"
-          URL="https://api.github.com/repos/$GITHUB_REPOSITORY/pulls?head=$OWNER:$BRANCH&base=main&state=open"
-
-          HTTP_STATUS=$(curl -s -o /tmp/prs.json -w "%{http_code}" -H "Authorization: token $GITHUB_TOKEN" "$URL") || true
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "Warning: GitHub API returned status $HTTP_STATUS when checking PRs. Proceeding to create PR." >&2
-            echo "pr_exists=false" >> "$GITHUB_OUTPUT"
-            echo "pr_check_error=true" >> "$GITHUB_OUTPUT"
-          else
-            BODY=$(cat /tmp/prs.json || true)
-            if [ -n "$BODY" ] && [ "$BODY" != "[]" ]; then
-              echo "pr_exists=true" >> "$GITHUB_OUTPUT"
-              echo "Found existing PR for $BRANCH"
-            else
-              echo "pr_exists=false" >> "$GITHUB_OUTPUT"
-              echo "No existing PR found for $BRANCH"
-            fi
-          fi
-
-      - name: Create Pull Request from feature branch to main
-        if: startsWith(github.ref, 'refs/heads/feature/') && success() && steps.check_pr.outputs.pr_exists == 'false'
-        uses: peter-evans/create-pull-request@v5
+        uses: actions/github-script@v6
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(ci): automated PR from feature branch to main\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
-          branch: ${{ github.ref_name }}
-          title: "chore: automated PR from ${{ github.ref_name }} to main"
-          body: "Automated PR created by CI run ${{ github.run_id }}"
-          labels: automated
-          base: main
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = context.ref.replace('refs/heads/','');
+            const base = 'main';
+            const title = `Auto PR: ${head} → ${base}`;
+            const body = `Automated PR created/updated because CI passed.\n\nBranch: ${head}\nCommit: ${context.sha}`;
+
+            // Compare commits to gather info
+            let compare;
+            try {
+              compare = await github.rest.repos.compareCommits({ owner, repo, base, head });
+            } catch (err) {
+              console.log('Could not compare commits:', err.message);
+            }
+
+            const commits = (compare && compare.data && compare.data.commits) || [];
+            const assignees = [...new Set(commits.map(c => c.author && c.author.login).filter(Boolean))];
+
+            const labelsSet = new Set();
+            for (const c of commits) {
+              const msg = (c.commit && c.commit.message || '').toLowerCase();
+              if (/\b(feat|feature)(\b|:|\()/i.test(msg)) labelsSet.add('enhancement');
+              if (/\b(fix|bug)(\b|:|\()/i.test(msg)) labelsSet.add('bug');
+            }
+
+            const files = (compare && compare.data && compare.data.files) || [];
+            for (const f of files) {
+              const path = (f.filename || '').toLowerCase();
+              if (path.endsWith('.md') || path.startsWith('docs/') || path.includes('/docs/')) {
+                labelsSet.add('documentation');
+              }
+              if (path.includes('.github/workflows') || path.includes('jenkinsfile') || path.includes('circleci')) {
+                labelsSet.add('ci');
+              }
+              if ((path.endsWith('.yml') || path.endsWith('.yaml')) && path.includes('.github')) {
+                labelsSet.add('ci');
+              }
+            }
+
+            const labels = Array.from(labelsSet);
+
+            async function ensureLabel(name, color) {
+              try {
+                await github.rest.issues.getLabel({ owner, repo, name });
+              } catch (err) {
+                if (err.status === 404) {
+                  await github.rest.issues.createLabel({ owner, repo, name, color, description: 'Label created automatically by CI' });
+                } else {
+                  throw err;
+                }
+              }
+            }
+
+            if (labels.includes('enhancement')) await ensureLabel('enhancement', 'a2eeef');
+            if (labels.includes('bug')) await ensureLabel('bug', 'd73a4a');
+            if (labels.includes('documentation')) await ensureLabel('documentation', '0075ca');
+            if (labels.includes('ci')) await ensureLabel('ci', 'f9d0c4');
+
+            const { data: prs } = await github.rest.pulls.list({ owner, repo, head: `${owner}:${head}`, state: 'open' });
+
+            if (prs && prs.length > 0) {
+              const pr = prs[0];
+              await github.rest.pulls.update({ owner, repo, pull_number: pr.number, title, body });
+              if (assignees.length > 0) {
+                try { await github.rest.issues.addAssignees({ owner, repo, issue_number: pr.number, assignees }); } catch (err) { console.log('Could not add some assignees:', err.message); }
+              }
+              if (labels.length > 0) { await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels }); }
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: 'CI: build and unit tests passed. PR updated automatically (assignees/labels applied).' });
+              console.log(`PR updated: ${pr.html_url}`);
+              return;
+            }
+
+            const { data: newPr } = await github.rest.pulls.create({ owner, repo, title, head, base, body });
+            if (assignees.length > 0) {
+              try { await github.rest.issues.addAssignees({ owner, repo, issue_number: newPr.number, assignees }); } catch (err) { console.log('Could not add some assignees:', err.message); }
+            }
+            if (labels.length > 0) { await github.rest.issues.addLabels({ owner, repo, issue_number: newPr.number, labels }); }
+            console.log(`PR created: ${newPr.html_url}`);
