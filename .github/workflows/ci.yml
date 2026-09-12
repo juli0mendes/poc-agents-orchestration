@@ -84,27 +84,14 @@ jobs:
             echo "updated=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Prepare feature branch for PR
-        if: startsWith(github.ref, 'refs/heads/feature/') && success()
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          BRANCH="feature/coverage-badge-${{ github.run_id }}"
-          git checkout -b "$BRANCH"
-          git commit --allow-empty -m "chore(ci): create branch for coverage PR (run $GITHUB_RUN_ID)"
-          git push origin "$BRANCH"
-
-      - name: Create Pull Request with changes
+      - name: Create Pull Request from feature branch to main
         if: startsWith(github.ref, 'refs/heads/feature/') && success()
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore(ci): update coverage badge\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
-          # create a feature branch per run to open PRs like feature/coverage-badge-<run_id>
-          branch: "feature/coverage-badge-${{ github.run_id }}"
-          title: "chore: update coverage badge"
-          body: "Automated coverage badge update"
+          commit-message: "chore(ci): automated PR from feature branch to main\n\nCo-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+          branch: ${{ github.ref_name }}
+          title: "chore: automated PR from ${{ github.ref_name }} to main"
+          body: "Automated PR created by CI run ${{ github.run_id }}"
           labels: automated
           base: main
