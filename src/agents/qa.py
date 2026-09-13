@@ -1,5 +1,6 @@
 from langchain_ollama import ChatOllama
 
+from src.models.qa import QAReport, QAStatus
 from src.models.qa import QAReport
 from src.state import AgentState
 
@@ -65,6 +66,9 @@ Rules:
 
     qa_report = structured_llm.invoke(prompt)
 
+    if qa_report.issues:
+        qa_report.status = QAStatus.FAILED
+
     print(
         f"[QA] {qa_report.status} "
         f"iteration={iteration} "
@@ -74,6 +78,6 @@ Rules:
     return {
         "qa_report": qa_report,
         "status": "QA_PASSED"
-        if qa_report.status == "PASSED"
+        if qa_report.status == QAStatus.PASSED
         else "QA_FAILED",
     }

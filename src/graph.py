@@ -16,6 +16,14 @@ def sre_agent(state: AgentState):
     }
 
 
+def workflow_failed(state: AgentState):
+    print("[WORKFLOW] Finalizado com falha.")
+
+    return {
+        "status": "WORKFLOW_FAILED"
+    }
+
+
 MAX_ITERATIONS = 3
 
 
@@ -33,7 +41,7 @@ def qa_router(state: AgentState):
 
     if iteration >= MAX_ITERATIONS:
         print("[ROUTER] Limite de iterações atingido.")
-        return "sre"
+        return "failed"
 
     return "developer"
 
@@ -45,6 +53,7 @@ builder.add_node("architect", architect_agent)
 builder.add_node("developer", developer_agent)
 builder.add_node("qa", qa_agent)
 builder.add_node("sre", sre_agent)
+builder.add_node("failed", workflow_failed)
 
 builder.add_edge(START, "pm")
 builder.add_edge("pm", "architect")
@@ -57,9 +66,11 @@ builder.add_conditional_edges(
     {
         "developer": "developer",
         "sre": "sre",
+        "failed": "failed",
     }
 )
 
 builder.add_edge("sre", END)
+builder.add_edge("failed", END)
 
 graph = builder.compile()

@@ -31,3 +31,10 @@ print(result["architecture"].model_dump_json(indent=2))
 print()
 print("Implementation:")
 print(result["implementation"].model_dump_json(indent=2))
+
+print()
+print("QA Report:")
+print(result["qa_report"].model_dump_json(indent=2))
+
+print()
+print(f"Final Status: {result['status']}")
