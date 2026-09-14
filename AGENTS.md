@@ -4,7 +4,7 @@
 
 Este repositório é uma PoC (proof of concept) para aplicar conhecimento sobre GenAI e orchestration de agentes. A ideia central é demonstrar um workflow de agentes de IA em Python, onde cada agente assume um papel específico no ciclo de desenvolvimento de software: Product Manager, Architect, Developer, QA e SRE.
 
-O projeto usa LangChain + LangGraph para orquestrar chamadas estruturadas a um modelo local de LLM via Ollama. As saídas dos agentes são modeladas com Pydantic para manter contratos e facilitar a validação do que cada etapa produz.
+O projeto usa LangChain + LangGraph para orquestrar chamadas estruturadas a um modelo local de LLM. Para invocações locais os agentes usam langchain_ollama.ChatOllama (ex.: qwen3:8b) e aplicam with_structured_output para validar respostas com modelos Pydantic (v2). O estado do workflow pode ser persistido em SQLite (`src/persistence/sqlite.py`). Observação: `src/agents/sre.py` existe mas está vazio — um simples `sre_agent` está implementado inline em `src/graph.py` como placeholder para a etapa SRE.
 
 ## CI/CD e automação
 

@@ -10,7 +10,8 @@ Este repositório é uma PoC para aplicar e demonstrar conhecimento sobre GenAI 
 
 > Progresso do projeto: veja o relatório de progresso detalhado em [PROGRESS.md](PROGRESS.md).
 
-A implementação atual usa Python com LangChain e LangGraph para orquestrar agentes que desempenham papéis como Product Manager, Architect, Developer, QA e SRE. A execução usa um modelo local via Ollama, com saída estruturada em Pydantic.
+A implementação atual usa Python com LangChain e LangGraph para orquestrar agentes que desempenham papéis como Product Manager, Architect, Developer, QA e SRE. Para invocações de LLM locais o projeto usa langchain_ollama.ChatOllama (ex.: qwen3:8b). As respostas dos agentes são modeladas e validadas com Pydantic (v2) usando with_structured_output.
+
 
 ## Status de CI
 
