@@ -1,6 +1,7 @@
 from langchain_ollama import ChatOllama
 
 from src.models.implementation import Implementation
+from src.tools.workspace import materialize_implementation
 from src.state import AgentState
 
 
@@ -44,20 +45,44 @@ PREVIOUS QA REPORT:
 Rules:
 
 - Use Java 21.
-- Use Spring Boot.
+- Use Spring Boot 3.x.
 - Follow the provided architecture.
 - Apply Clean Architecture principles.
 - Apply DDD where appropriate.
 - Generate production-quality code.
-- Generate unit tests for the main business logic.
-- Use Maven.
+
+MAVEN PROJECT REQUIREMENTS:
+
+- Generate a complete Maven project.
+- Always include a pom.xml file at the project root.
+- The pom.xml must declare all required dependencies.
+- Configure Maven to compile using Java 21.
+- Follow the standard Maven directory structure.
+- Generate unit tests using JUnit 5.
+- Include the Spring Boot Maven plugin.
+- The generated project must support execution with mvn test.
+
+SOURCE CODE REQUIREMENTS:
+
 - Every generated file must contain its complete content.
+- Include all required classes, methods, imports and configuration files.
+- Ensure package declarations match their directory paths.
+- Ensure all referenced classes and methods exist.
+- Use APIs compatible with Spring Boot 3.x and Spring Security 6.
 - Do not omit code with placeholders such as "TODO", "...", or comments
   saying that implementation was omitted.
 - Keep the implementation focused on the requirements.
-- Do not generate Docker, Kubernetes, Terraform or cloud infrastructure yet.
 
-Return the implementation as a structured list of files.
+FILE GENERATION RULES:
+
+- Return all project files as a structured list.
+- Each file must contain its relative path and complete content.
+- The pom.xml path must be exactly "pom.xml".
+- Java source files must be under src/main/java/.
+- Java test files must be under src/test/java/.
+- Configuration files must be under src/main/resources/.
+- Each iteration must return the complete project, not only changed files.
+- Do not generate Docker, Kubernetes, Terraform or cloud infrastructure yet.
 
 If a previous QA report exists, fix all reported issues
 in the new implementation.
@@ -68,10 +93,17 @@ The new implementation must incorporate the QA feedback.
 
     implementation = structured_llm.invoke(prompt)
 
-    print(
-        f"[DEVELOPER] Implementation generated. "
-        f"iteration: {current_iteration} -> {next_iteration}"
-    )
+    materialize_implementation(implementation)
+
+    generated_files = [file.path for file in implementation.files]
+
+    print(f"[DEVELOPER] Generated {len(generated_files)} files")
+
+    for path in generated_files:
+        print(f"  - {path}")
+
+    if "pom.xml" not in generated_files:
+        print("[DEVELOPER] WARNING: pom.xml was not generated")
 
     return {
         "implementation": implementation,
