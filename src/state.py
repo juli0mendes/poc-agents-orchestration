@@ -4,6 +4,7 @@ from src.models.requirements import Requirements
 from src.models.architecture import Architecture
 from src.models.implementation import Implementation
 from src.models.qa import QAReport
+from src.models.build import BuildResult
 
 
 class AgentState(TypedDict, total=False):
@@ -15,3 +16,4 @@ class AgentState(TypedDict, total=False):
     sre_report: dict
     iteration: int
     status: str
+    build_result: BuildResult
